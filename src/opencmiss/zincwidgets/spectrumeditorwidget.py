@@ -22,6 +22,7 @@ from opencmiss.zinc.status import OK as ZINC_OK
 from opencmiss.zincwidgets.ui.ui_spectrumeditorwidget import Ui_SpectrumEditorWidget
 from opencmiss.argon.settings.mainsettings import FLOAT_STRING_FORMAT
 from opencmiss.argon.core.argonlogger import ArgonLogger
+from opencmiss.utils.zinc.general import ChangeManager
 
 COMPONENT_NAME_FORMAT = '{:d}. '
 SPECTRUM_DATA_ROLE = QtCore.Qt.UserRole + 1
@@ -175,29 +176,23 @@ class SpectrumEditorWidget(QtWidgets.QWidget):
             self._previewZincScene.removeAllGraphics()
             return
         points = self._previewZincScene.getFirstGraphics()
-        self._previewZincScene.beginChange()
-        if not points.isValid():
-            points = self._previewZincScene.createGraphicsPoints()
-            pointsattr = points.getGraphicspointattributes()
-            pointsattr.setBaseSize(1.0)
-        else:
-            pointsattr = points.getGraphicspointattributes()
-        colourBar = self._spectrums.findOrCreateSpectrumGlyphColourBar(spectrum)
-        pointsattr.setGlyph(colourBar)
-        self._previewZincScene.endChange()
+        with ChangeManager(self._previewZincScene):
+            if not points.isValid():
+                points = self._previewZincScene.createGraphicsPoints()
+                pointsattr = points.getGraphicspointattributes()
+                pointsattr.setBaseSize(1.0)
+            else:
+                pointsattr = points.getGraphicspointattributes()
+            colourBar = self._spectrums.findOrCreateSpectrumGlyphColourBar(spectrum)
+            pointsattr.setGlyph(colourBar)
+            
         sceneviewer = self._ui.sceneviewerWidgetPreview.getSceneviewer()
         if sceneviewer:
-            sceneviewer.beginChange()
-            sceneviewer.setScene(self._previewZincScene)
-            sceneviewer.setProjectionMode(Sceneviewer.PROJECTION_MODE_PARALLEL)
-            _, centre = colourBar.getCentre(3)
-            eye = [centre[0], centre[1], centre[2] + 5.0]
-            up = [-1.0, 0.0, 0.0]
-            sceneviewer.setLookatParametersNonSkew(eye, centre, up)
-            sceneviewer.setNearClippingPlane(1.0)
-            sceneviewer.setFarClippingPlane(10.0)
-            sceneviewer.setViewAngle(0.25)
-            sceneviewer.endChange()
+            with ChangeManager(sceneviewer):
+                _, centre = colourBar.getCentre(3)
+                eye = [centre[0], centre[1], centre[2] + 5.0]
+                up = [-1.0, 0.0, 0.0]
+                sceneviewer.setLookatParametersNonSkew(eye, centre, up)
 
     def _getCurrentSpectrumcomponent(self):
         spectrum_component_items = self._ui.listWidgetSpectrumComponents.selectedItems()
@@ -279,7 +274,6 @@ class SpectrumEditorWidget(QtWidgets.QWidget):
                 pass
             else:
                 self._selected_spectrum_components_row = lwsc.row(item)
-
         self._updateComponentUi()
 
     def _selectSpectrumByName(self, name):
@@ -502,6 +496,13 @@ class SpectrumEditorWidget(QtWidgets.QWidget):
             self._ui.listWidgetSpectrums.setCurrentRow(0)
             first_item = self._ui.listWidgetSpectrums.item(0)
             self._spectrumItemClicked(first_item)
+        sceneviewer = self._ui.sceneviewerWidgetPreview.getSceneviewer()
+        with ChangeManager(sceneviewer):
+            sceneviewer.setScene(self._previewZincScene)
+            sceneviewer.setProjectionMode(Sceneviewer.PROJECTION_MODE_PARALLEL)
+            sceneviewer.setNearClippingPlane(1.0)
+            sceneviewer.setFarClippingPlane(10.0)
+            sceneviewer.setViewAngle(0.25)
 
     def setSpectrums(self, spectrums):
         """
@@ -516,9 +517,6 @@ class SpectrumEditorWidget(QtWidgets.QWidget):
         self._previewZincRegion = self._zincContext.createRegion()
         self._previewZincRegion.setName("Spectrum editor preview region")
         self._previewZincScene = self._previewZincRegion.getScene()
-        sceneviewer = self._ui.sceneviewerWidgetPreview.getSceneviewer()
-        if sceneviewer:
-            sceneviewer.setScene(self._previewZincScene)
         spectrummodule = self._zincContext.getSpectrummodule()
         self._spectrummodulenotifier = spectrummodule.createSpectrummodulenotifier()
         self._spectrummodulenotifier.setCallback(self._spectrummoduleCallback)
