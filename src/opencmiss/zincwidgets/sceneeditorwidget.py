@@ -53,6 +53,11 @@ class SceneEditorWidget(QtWidgets.QWidget):
         region = self._ui.region_chooser.getRegion()
         self.setScene(region.getScene())
 
+    def setRegion(self, region):
+        self._ui.region_chooser.setRegion(region)
+        region = self._ui.region_chooser.getRegion()
+        self.setScene(region.getScene())
+
     def setZincRootRegion(self, root_region):
         self._ui.region_chooser.setRootRegion(root_region)
         self.setScene(root_region.getScene())
